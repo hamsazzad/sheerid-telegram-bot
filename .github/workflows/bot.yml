@@ -1,0 +1,39 @@
+name: Telegram Bot Runner
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install node-telegram-bot-api
+
+      - name: Run Telegram Bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          TELEGRAM_ADMIN_USERNAME: ${{ secrets.TELEGRAM_ADMIN_USERNAME }}
+          TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+        run: |
+          echo "Starting Telegram Bot..."
+          while true; do
+            node bot-standalone.mjs &
+            BOT_PID=$!
+            echo "Bot started with PID $BOT_PID"
+            sleep 18000
+            echo "Restarting bot to prevent timeout..."
+            kill $BOT_PID 2>/dev/null || true
+            sleep 5
+          done
