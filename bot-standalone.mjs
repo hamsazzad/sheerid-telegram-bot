@@ -1,6 +1,4 @@
 import TelegramBot from "node-telegram-bot-api";
-import { execSync } from "child_process";
-import * as fs from "fs";
 import crypto from "crypto";
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -11,58 +9,22 @@ if (!BOT_TOKEN) {
 
 const ADMIN_USERNAME = (process.env.TELEGRAM_ADMIN_USERNAME || "Aamoviesadmin").replace("@", "").toLowerCase();
 const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID || "@aamoviesofficial";
+const REPLIT_SERVER = "https://sheer-id-verify.replit.app";
 const VERIFICATION_COST = 50;
 const JOIN_REWARD = 20;
 const DAILY_REWARD = 5;
 const REFERRAL_REWARD = 10;
 
-const SHEERID_BASE_URL = "https://services.sheerid.com";
-const MY_SHEERID_URL = "https://my.sheerid.com";
-
-const TOOL_CONFIGS = {
-  "spotify-verify": { programId: "67c8c14f5f17a83b745e3f82", verifyType: "student", collectStep: "collectStudentPersonalInfo" },
-  "youtube-verify": { programId: "67c8c14f5f17a83b745e3f82", verifyType: "student", collectStep: "collectStudentPersonalInfo" },
-  "one-verify": { programId: "67c8c14f5f17a83b745e3f82", verifyType: "student", collectStep: "collectStudentPersonalInfo" },
-  "boltnew-verify": { programId: "68cc6a2e64f55220de204448", verifyType: "teacher", collectStep: "collectTeacherPersonalInfo" },
-  "canva-teacher": { programId: "68cc6a2e64f55220de204448", verifyType: "teacher", collectStep: "collectTeacherPersonalInfo" },
-  "k12-verify": { programId: "68d47554aa292d20b9bec8f7", verifyType: "k12teacher", collectStep: "collectTeacherPersonalInfo" },
-  "veterans-verify": { programId: "67c8c14f5f17a83b745e3f82", verifyType: "student", collectStep: "collectStudentPersonalInfo" },
-  "veterans-extension": { programId: "67c8c14f5f17a83b745e3f82", verifyType: "student", collectStep: "collectStudentPersonalInfo" },
-};
-
 const TOOLS_DATA = {
-  "spotify-verify": { name: "Spotify Premium", isActive: true },
-  "youtube-verify": { name: "YouTube Premium", isActive: true },
-  "one-verify": { name: "Gemini Advanced", isActive: true },
-  "boltnew-verify": { name: "Bolt.new", isActive: true },
-  "canva-teacher": { name: "Canva Education", isActive: true },
-  "k12-verify": { name: "ChatGPT Plus", isActive: true },
-  "veterans-verify": { name: "Military Verification", isActive: true },
-  "veterans-extension": { name: "Chrome Extension", isActive: true },
+  "spotify-verify": { name: "Spotify Premium" },
+  "youtube-verify": { name: "YouTube Premium" },
+  "one-verify": { name: "Gemini Advanced" },
+  "boltnew-verify": { name: "Bolt.new" },
+  "canva-teacher": { name: "Canva Education" },
+  "k12-verify": { name: "ChatGPT Plus" },
+  "veterans-verify": { name: "Military Verification" },
+  "veterans-extension": { name: "Chrome Extension" },
 };
-
-const PSU_SCHOOLS = [
-  { id: 2565, idExtended: "2565", name: "Pennsylvania State University-Main Campus", domain: "PSU.EDU" },
-  { id: 651379, idExtended: "651379", name: "Pennsylvania State University-World Campus", domain: "PSU.EDU" },
-  { id: 8387, idExtended: "8387", name: "Pennsylvania State University-Penn State Harrisburg", domain: "PSU.EDU" },
-  { id: 8382, idExtended: "8382", name: "Pennsylvania State University-Penn State Altoona", domain: "PSU.EDU" },
-  { id: 8396, idExtended: "8396", name: "Pennsylvania State University-Penn State Berks", domain: "PSU.EDU" },
-  { id: 8379, idExtended: "8379", name: "Pennsylvania State University-Penn State Brandywine", domain: "PSU.EDU" },
-  { id: 2560, idExtended: "2560", name: "Pennsylvania State University-College of Medicine", domain: "PSU.EDU" },
-  { id: 650600, idExtended: "650600", name: "Pennsylvania State University-Penn State Lehigh Valley", domain: "PSU.EDU" },
-  { id: 8388, idExtended: "8388", name: "Pennsylvania State University-Penn State Hazleton", domain: "PSU.EDU" },
-  { id: 8394, idExtended: "8394", name: "Pennsylvania State University-Penn State Worthington Scranton", domain: "PSU.EDU" },
-];
-
-const K12_SCHOOLS = [
-  { id: 3995910, idExtended: "3995910", name: "Springfield High School (Springfield, OR)" },
-  { id: 3995271, idExtended: "3995271", name: "Springfield High School (Springfield, OH)" },
-  { id: 3992142, idExtended: "3992142", name: "Springfield High School (Springfield, IL)" },
-  { id: 3996208, idExtended: "3996208", name: "Springfield High School (Springfield, PA)" },
-  { id: 4015002, idExtended: "4015002", name: "Springfield High School (Springfield, TN)" },
-  { id: 4015001, idExtended: "4015001", name: "Springfield High School (Springfield, VT)" },
-  { id: 4014999, idExtended: "4014999", name: "Springfield High School (Springfield, LA)" },
-];
 
 const users = new Map();
 const statsData = { totalAttempts: 0, successCount: 0, failedCount: 0 };
@@ -117,332 +79,38 @@ function isAdmin(username) {
   return username.toLowerCase() === ADMIN_USERNAME;
 }
 
+function detectToolId(url) {
+  const linkLower = url.toLowerCase();
+  if (linkLower.includes("spotify")) return "spotify-verify";
+  if (linkLower.includes("youtube")) return "youtube-verify";
+  if (linkLower.includes("google") || linkLower.includes("one.google")) return "one-verify";
+  if (linkLower.includes("bolt")) return "boltnew-verify";
+  if (linkLower.includes("canva")) return "canva-teacher";
+  if (linkLower.includes("chatgpt") || linkLower.includes("openai")) return "k12-verify";
+  return "spotify-verify";
+}
+
 function parseVerificationId(url) {
   const match = url.match(/verificationId=([a-f0-9-]+)/i);
   if (match) return match[1].replace(/-/g, "");
   return null;
 }
 
-function parseExternalUserId(url) {
-  const match = url.match(/externalUserId=([^&]+)/i);
-  if (match) return match[1];
-  return null;
-}
+async function forwardToReplitServer(toolId, url) {
+  const response = await fetch(`${REPLIT_SERVER}/api/verifications/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ toolId, url, autoGenerate: true }),
+    signal: AbortSignal.timeout(600000),
+  });
 
-function generateDeviceFingerprint() {
-  return crypto.randomBytes(16).toString("hex");
-}
-
-const firstNames = [
-  "James","Mary","Robert","Patricia","John","Jennifer","Michael","Linda","David","Elizabeth",
-  "William","Barbara","Richard","Susan","Joseph","Jessica","Thomas","Sarah","Christopher","Karen",
-  "Charles","Lisa","Daniel","Nancy","Matthew","Betty","Anthony","Margaret","Mark","Sandra",
-  "Donald","Ashley","Steven","Dorothy","Andrew","Kimberly","Paul","Emily","Joshua","Donna",
-  "Kenneth","Michelle","Kevin","Carol","Brian","Amanda","George","Melissa","Timothy","Deborah",
-  "Ronald","Stephanie","Edward","Rebecca","Jason","Sharon","Jeffrey","Laura","Ryan","Cynthia",
-];
-const lastNames = [
-  "Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Rodriguez","Martinez",
-  "Hernandez","Lopez","Gonzalez","Wilson","Anderson","Thomas","Taylor","Moore","Jackson","Martin",
-  "Lee","Perez","Thompson","White","Harris","Sanchez","Clark","Ramirez","Lewis","Robinson",
-  "Walker","Young","Allen","King","Wright","Scott","Torres","Nguyen","Hill","Flores",
-  "Green","Adams","Nelson","Baker","Hall","Rivera","Campbell","Mitchell","Carter","Roberts",
-];
-
-function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
-
-function generateRandomName() {
-  return { firstName: pick(firstNames), lastName: pick(lastNames) };
-}
-
-function generateEmail(firstName, lastName, domain = "psu.edu") {
-  const digits = Math.floor(Math.random() * 9000 + 1000);
-  return `${firstName.toLowerCase()}.${lastName.toLowerCase()}${digits}@${domain.toLowerCase()}`;
-}
-
-function generateBirthDate(type) {
-  if (type === "teacher" || type === "k12teacher") {
-    const year = 1970 + Math.floor(Math.random() * 30);
-    const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, "0");
-    const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-  const year = 2000 + Math.floor(Math.random() * 6);
-  const month = String(Math.floor(Math.random() * 12) + 1).padStart(2, "0");
-  const day = String(Math.floor(Math.random() * 28) + 1).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function generateStudentId() {
-  return `${Math.floor(100000000 + Math.random() * 900000000)}`;
-}
-
-function generateNewRelicHeaders() {
-  const traceId = crypto.randomUUID().replace(/-/g, "");
-  const spanId = crypto.randomUUID().replace(/-/g, "").substring(0, 16);
-  const timestamp = Date.now();
-  const payload = { v: [0, 1], d: { ty: "Browser", ac: "364029", ap: "120719994", id: spanId, tr: traceId, ti: timestamp } };
-  return {
-    newrelic: Buffer.from(JSON.stringify(payload)).toString("base64"),
-    traceparent: `00-${traceId}-${spanId}-01`,
-    tracestate: `364029@nr=0-1-364029-120719994-${spanId}----${timestamp}`,
-  };
-}
-
-function getSheerIdHeaders() {
-  const userAgents = [
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  ];
-  return {
-    "accept": "application/json",
-    "content-type": "application/json",
-    "user-agent": pick(userAgents),
-    "clientversion": "2.193.0",
-    "clientname": "jslib",
-    "x-sheerid-target-platform": "web",
-    ...generateNewRelicHeaders(),
-  };
-}
-
-async function sheeridRequest(method, url, body) {
-  const options = {
-    method,
-    headers: getSheerIdHeaders(),
-    signal: AbortSignal.timeout(30000),
-  };
-  if (body) options.body = JSON.stringify(body);
-  const response = await fetch(url, options);
-  let data;
-  const text = await response.text();
-  try { data = JSON.parse(text); } catch { data = text; }
-  return { data, status: response.status };
-}
-
-async function uploadToS3(uploadUrl, data, mimeType) {
-  try {
-    const response = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: { "Content-Type": mimeType },
-      body: data,
-      signal: AbortSignal.timeout(60000),
-    });
-    return response.status >= 200 && response.status < 300;
-  } catch { return false; }
-}
-
-function generateDocumentPdf(firstName, lastName, verifyType, organizationName) {
-  const name = `${firstName} ${lastName}`;
-  const dateStr = new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
-  const semester = currentMonth >= 0 && currentMonth <= 4 ? "Spring" : currentMonth >= 5 && currentMonth <= 7 ? "Summer" : "Fall";
-  const termStr = `${semester} ${currentYear}`;
-  const majors = ["Computer Science","Biology","Psychology","Business Administration","Engineering","English Literature","Mathematics","Economics"];
-  const major = pick(majors);
-  const credits = Math.floor(Math.random() * 6 + 12);
-  const studentId = generateStudentId();
-
-  let content;
-  if (verifyType === "student") {
-    content = [
-      organizationName,
-      "Office of the Registrar",
-      "",
-      `Date: ${dateStr}`,
-      "",
-      "ENROLLMENT VERIFICATION",
-      "",
-      `Student Name: ${name}`,
-      `Student ID: ${studentId}`,
-      `Enrollment Status: Active - Full Time`,
-      `Current Term: ${termStr}`,
-      `Program / Major: ${major}`,
-      `Degree Level: Bachelor's Degree`,
-      `Credits Enrolled: ${credits}`,
-      "",
-      `This letter serves as official confirmation that ${name} is currently enrolled at ${organizationName}.`,
-      "",
-      "University Registrar",
-      organizationName,
-    ].join("\n");
-  } else {
-    const titles = ["Associate Professor","Assistant Professor","Lecturer","Instructor"];
-    const departments = ["Department of Computer Science","Department of Biology","Department of Mathematics"];
-    content = [
-      organizationName,
-      "Human Resources Department",
-      "",
-      `Date: ${dateStr}`,
-      "",
-      "EMPLOYMENT VERIFICATION",
-      "",
-      `Employee Name: ${name}`,
-      `Position: ${pick(titles)}`,
-      `Department: ${pick(departments)}`,
-      `Employment Status: Active - Full Time`,
-      `Employment Type: Faculty`,
-      `Hire Date: August 15, 2018`,
-      "",
-      `This letter confirms the employment of ${name} at ${organizationName}.`,
-      "",
-      "Director of Human Resources",
-      organizationName,
-    ].join("\n");
-  }
-
-  return Buffer.from(content, "utf-8");
-}
-
-async function runVerification(params) {
-  const { toolId, verificationId, firstName, lastName, email, birthDate, url } = params;
-  const config = TOOL_CONFIGS[toolId];
-  if (!config) return { success: false, pending: false, message: `No configuration for tool: ${toolId}`, verificationId, steps: [] };
-
-  const steps = [];
-  const deviceFingerprint = generateDeviceFingerprint();
-  const externalUserId = parseExternalUserId(url);
-
-  let school;
-  if (config.verifyType === "k12teacher") {
-    school = pick(K12_SCHOOLS);
-  } else {
-    school = pick(PSU_SCHOOLS);
-  }
-
-  try {
-    const docData = generateDocumentPdf(firstName, lastName, config.verifyType, school.name);
-    let documents;
-    if (config.verifyType === "teacher" || config.verifyType === "k12teacher") {
-      const docData2 = generateDocumentPdf(firstName, lastName, config.verifyType, school.name);
-      documents = [
-        { fileName: "teacher_id.png", data: docData, mimeType: "image/png" },
-        { fileName: "employment_letter.png", data: docData2, mimeType: "image/png" },
-      ];
-    } else {
-      documents = [{ fileName: "student_card.png", data: docData, mimeType: "image/png" }];
-    }
-    steps.push({ step: "generateDocument", status: 200, data: { count: documents.length } });
-
-    const personalInfoBody = {
-      firstName, lastName,
-      birthDate: config.verifyType === "teacher" ? "" : birthDate,
-      email, phoneNumber: "",
-      organization: { id: school.id, idExtended: school.idExtended, name: school.name },
-      deviceFingerprintHash: deviceFingerprint,
-      locale: "en-US",
-      metadata: {},
-    };
-
-    if (config.verifyType === "student") {
-      personalInfoBody.metadata = {
-        marketConsentValue: false,
-        verificationId,
-        refererUrl: `${SHEERID_BASE_URL}/verify/${config.programId}/?verificationId=${verificationId}`,
-        flags: '{"collect-info-step-email-first":"default","doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","font-size":"default","include-cvec-field-france-student":"not-labeled-optional"}',
-        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
-      };
-    } else if (config.verifyType === "teacher") {
-      const extUserId = externalUserId || `${Math.floor(1000000 + Math.random() * 9000000)}`;
-      personalInfoBody.externalUserId = extUserId;
-      personalInfoBody.metadata = {
-        marketConsentValue: true,
-        refererUrl: url,
-        externalUserId: extUserId,
-        flags: '{"doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","include-cvec-field-france-student":"not-labeled-optional","org-search-overlay":"default","org-selected-display":"default"}',
-        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
-      };
-    } else {
-      personalInfoBody.metadata = {
-        marketConsentValue: false,
-        verificationId,
-        refererUrl: `${SHEERID_BASE_URL}/verify/${config.programId}/?verificationId=${verificationId}`,
-        flags: '{"doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","include-cvec-field-france-student":"not-labeled-optional"}',
-        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
-      };
-    }
-
-    const step2 = await sheeridRequest("POST", `${SHEERID_BASE_URL}/rest/v2/verification/${verificationId}/step/${config.collectStep}`, personalInfoBody);
-    steps.push({ step: config.collectStep, status: step2.status, data: step2.data });
-
-    if (step2.status !== 200) {
-      return { success: false, pending: false, message: `Personal info submission failed (HTTP ${step2.status})`, verificationId, steps };
-    }
-
-    if (step2.data?.currentStep === "error") {
-      return { success: false, pending: false, message: `SheerID error: ${(step2.data.errorIds || []).join(", ")}`, verificationId, errorIds: step2.data.errorIds, steps };
-    }
-
-    let currentStep = step2.data?.currentStep || "";
-
-    if (currentStep === "sso" || currentStep === config.collectStep) {
-      const step3 = await sheeridRequest("DELETE", `${SHEERID_BASE_URL}/rest/v2/verification/${verificationId}/step/sso`);
-      steps.push({ step: "skipSSO", status: step3.status, data: step3.data });
-      currentStep = step3.data?.currentStep || currentStep;
-    }
-
-    if (currentStep === "success") {
-      return { success: true, pending: false, message: "Verification approved instantly", verificationId, currentStep, redirectUrl: step2.data?.redirectUrl, steps };
-    }
-
-    const docUploadBody = { files: documents.map(doc => ({ fileName: doc.fileName, mimeType: doc.mimeType, fileSize: doc.data.length })) };
-    const step4 = await sheeridRequest("POST", `${SHEERID_BASE_URL}/rest/v2/verification/${verificationId}/step/docUpload`, docUploadBody);
-    steps.push({ step: "docUpload", status: step4.status, data: step4.data });
-
-    if (!step4.data?.documents || step4.data.documents.length === 0) {
-      return { success: false, pending: false, message: "Failed to get upload URL", verificationId, steps };
-    }
-
-    if (step4.data.documents.length < documents.length) {
-      return { success: false, pending: false, message: `Expected ${documents.length} upload URLs but got ${step4.data.documents.length}`, verificationId, steps };
-    }
-
-    let allUploaded = true;
-    for (let i = 0; i < documents.length; i++) {
-      const uploadUrl = step4.data.documents[i].uploadUrl;
-      const doc = documents[i];
-      const uploaded = await uploadToS3(uploadUrl, doc.data, doc.mimeType);
-      if (!uploaded) allUploaded = false;
-    }
-
-    if (!allUploaded) {
-      return { success: false, pending: false, message: "Document upload to S3 failed", verificationId, steps };
-    }
-
-    const step5 = await sheeridRequest("POST", `${SHEERID_BASE_URL}/rest/v2/verification/${verificationId}/step/completeDocUpload`);
-    steps.push({ step: "completeDocUpload", status: step5.status, data: step5.data });
-
-    const finalStep = step5.data?.currentStep || "unknown";
-    const redirectUrl = step5.data?.redirectUrl;
-    const rewardCode = step5.data?.rewardCode || step5.data?.rewardData?.rewardCode;
-
-    if (finalStep === "success") {
-      return { success: true, pending: false, message: "Verification successful", verificationId, currentStep: finalStep, redirectUrl, rewardCode, steps };
-    }
-
-    return { success: true, pending: true, message: "Document submitted, awaiting review", verificationId, currentStep: finalStep, redirectUrl, rewardCode, steps };
-  } catch (error) {
-    return {
-      success: false, pending: false,
-      message: error.name === "TimeoutError" ? "SheerID API request timed out" : `Verification failed: ${error.message}`,
-      verificationId, steps
-    };
-  }
-}
-
-async function checkVerificationStatus(verificationId) {
-  const { data, status } = await sheeridRequest("GET", `${MY_SHEERID_URL}/rest/v2/verification/${verificationId}`);
-  if (status !== 200) throw new Error(`Status check failed (HTTP ${status})`);
-  return {
-    currentStep: data?.currentStep || "unknown",
-    rewardCode: data?.rewardCode || data?.rewardData?.rewardCode,
-    redirectUrl: data?.redirectUrl,
-    errorIds: data?.errorIds,
-  };
+  const data = await response.json();
+  return { ok: response.ok, status: response.status, data };
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 console.log("[Telegram] Bot started with polling");
+console.log(`[Config] Replit server: ${REPLIT_SERVER}`);
 
 bot.onText(/\/start(.*)/, async (msg, match) => {
   try {
@@ -516,34 +184,32 @@ bot.on("callback_query", async (query) => {
 
           if (user.referredBy) {
             const referrer = getUserByReferralCode(user.referredBy);
-            if (referrer && referrer.telegramId !== telegramId) {
+            if (referrer) {
               addTokens(referrer.telegramId, REFERRAL_REWARD);
-              try {
-                await bot.sendMessage(parseInt(referrer.telegramId), `Someone joined using your referral link! You earned ${REFERRAL_REWARD} tokens.`);
-              } catch {}
+              try { await bot.sendMessage(parseInt(referrer.telegramId), `Your referral joined! You earned ${REFERRAL_REWARD} tokens!`); } catch {}
             }
           }
 
-          await bot.answerCallbackQuery(query.id, { text: `Verified! You earned ${JOIN_REWARD} tokens!` });
+          await bot.answerCallbackQuery(query.id, { text: `Welcome! You earned ${JOIN_REWARD} tokens!` });
           await bot.sendMessage(chatId,
-            `Channel membership verified! You earned ${JOIN_REWARD} tokens.\n\n` +
-            `Your balance: ${user.tokens} tokens\n\n` +
-            `Available commands:\n` +
-            `/verify {link} - Run verification (${VERIFICATION_COST} tokens)\n` +
-            `/daily - Claim daily bonus (${DAILY_REWARD} tokens)\n` +
-            `/balance - Check your token balance\n` +
-            `/referral - Get your referral link`
+            `Channel membership verified!\nYou earned ${JOIN_REWARD} tokens!\n\nYour balance: ${user.tokens} tokens\n\n` +
+            `Use /verify {link} to run a verification\n` +
+            `Use /daily to claim daily bonus\n` +
+            `Use /referral to get your referral link`
           );
         } else {
-          await bot.answerCallbackQuery(query.id, { text: "You haven't joined the channel yet. Please join first!", show_alert: true });
+          await bot.answerCallbackQuery(query.id, { text: "You haven't joined the channel yet!", show_alert: true });
         }
       } catch (err) {
-        console.error("[Telegram] Channel check error:", err.message);
-        await bot.answerCallbackQuery(query.id, { text: "Could not verify membership. Make sure you joined the channel and try again.", show_alert: true });
+        user.hasJoinedChannel = true;
+        addTokens(telegramId, JOIN_REWARD);
+        await bot.answerCallbackQuery(query.id, { text: `Welcome! You earned ${JOIN_REWARD} tokens!` });
+        await bot.sendMessage(chatId, `Welcome! You earned ${JOIN_REWARD} tokens!\nYour balance: ${user.tokens} tokens`);
       }
     }
   } catch (err) {
-    console.error("[Telegram] Callback query error:", err.message);
+    console.error("[Telegram] callback error:", err.message);
+    try { await bot.answerCallbackQuery(query.id, { text: "An error occurred." }); } catch {}
   }
 });
 
@@ -555,29 +221,26 @@ bot.onText(/\/daily/, async (msg) => {
   if (!user) { await bot.sendMessage(chatId, "Please use /start first to register."); return; }
   if (!user.hasJoinedChannel) { await bot.sendMessage(chatId, "Please join the channel and verify first using /start."); return; }
 
-  const now = new Date();
-  if (user.lastDaily) {
-    const diff = now.getTime() - new Date(user.lastDaily).getTime();
-    const hoursLeft = 24 - (diff / (1000 * 60 * 60));
-    if (hoursLeft > 0) {
-      const h = Math.floor(hoursLeft);
-      const m = Math.floor((hoursLeft - h) * 60);
-      await bot.sendMessage(chatId, `You already claimed your daily bonus. Come back in ${h}h ${m}m.`);
-      return;
-    }
+  const now = Date.now();
+  const oneDay = 24 * 60 * 60 * 1000;
+
+  if (user.lastDaily && (now - user.lastDaily) < oneDay) {
+    const timeLeft = oneDay - (now - user.lastDaily);
+    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+    await bot.sendMessage(chatId, `You've already claimed your daily bonus.\nCome back in ${hours}h ${minutes}m.\n\nYour balance: ${user.tokens} tokens`);
+    return;
   }
 
   user.lastDaily = now;
   addTokens(telegramId, DAILY_REWARD);
-  await bot.sendMessage(chatId, `Daily bonus claimed! +${DAILY_REWARD} tokens\nYour balance: ${user.tokens} tokens`);
+  await bot.sendMessage(chatId, `Daily bonus claimed! +${DAILY_REWARD} tokens\n\nYour balance: ${user.tokens} tokens`);
 });
 
 bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
   const user = getUser(msg.from.id.toString());
-
   if (!user) { await bot.sendMessage(chatId, "Please use /start first to register."); return; }
-
   await bot.sendMessage(chatId,
     `Your token balance: ${user.tokens} tokens\n\n` +
     `Earn tokens:\n- /daily — ${DAILY_REWARD} tokens (once per day)\n- /referral — ${REFERRAL_REWARD} tokens per referral\n\n` +
@@ -588,9 +251,7 @@ bot.onText(/\/balance/, async (msg) => {
 bot.onText(/\/referral/, async (msg) => {
   const chatId = msg.chat.id;
   const user = getUser(msg.from.id.toString());
-
   if (!user) { await bot.sendMessage(chatId, "Please use /start first to register."); return; }
-
   const botInfo = await bot.getMe();
   const referralLink = `https://t.me/${botInfo.username}?start=ref_${user.referralCode}`;
   await bot.sendMessage(chatId, `Your referral link:\n${referralLink}\n\nShare this link with friends. You'll earn ${REFERRAL_REWARD} tokens for each person who joins!`);
@@ -615,84 +276,68 @@ bot.onText(/\/verify(?:\s+(.+))?/, async (msg, match) => {
   const verificationId = parseVerificationId(link);
   if (!verificationId) { await bot.sendMessage(chatId, "Invalid link. URL must contain a verificationId parameter."); return; }
 
-  let detectedToolId = "spotify-verify";
-  const linkLower = link.toLowerCase();
-  if (linkLower.includes("spotify")) detectedToolId = "spotify-verify";
-  else if (linkLower.includes("youtube")) detectedToolId = "youtube-verify";
-  else if (linkLower.includes("google") || linkLower.includes("one.google")) detectedToolId = "one-verify";
-  else if (linkLower.includes("bolt")) detectedToolId = "boltnew-verify";
-  else if (linkLower.includes("canva")) detectedToolId = "canva-teacher";
-  else if (linkLower.includes("chatgpt") || linkLower.includes("openai")) detectedToolId = "k12-verify";
-
-  const config = TOOL_CONFIGS[detectedToolId];
+  const detectedToolId = detectToolId(link);
   const tool = TOOLS_DATA[detectedToolId];
-  if (!config || !tool || !tool.isActive) { await bot.sendMessage(chatId, "This verification tool is currently disabled."); return; }
+  if (!tool) { await bot.sendMessage(chatId, "This verification tool is currently unavailable."); return; }
 
   const deducted = deductTokens(telegramId, VERIFICATION_COST);
   if (!deducted) { await bot.sendMessage(chatId, "Failed to deduct tokens. Please try again."); return; }
 
   const statusMsg = await bot.sendMessage(chatId,
-    `Verification started for ${tool.name}...\nTokens deducted: ${VERIFICATION_COST}\nPlease wait, this may take a few minutes.`
+    `Verification started for ${tool.name}...\n` +
+    `Tokens deducted: ${VERIFICATION_COST}\n` +
+    `Forwarding to server... Please wait, this may take several minutes.`
   );
 
   let tokensRefunded = false;
   try {
-    const { firstName, lastName } = generateRandomName();
-    const email = generateEmail(firstName, lastName, "psu.edu");
-    const birthDate = generateBirthDate(config.verifyType);
-
-    const result = await runVerification({
-      toolId: detectedToolId, verificationId, firstName, lastName, email, birthDate, url: link,
-    });
-
-    let finalStatus = "failed";
-    let errorMsg = null;
-    let finalRedirectUrl = result.redirectUrl;
-
-    if (result.success && !result.pending) {
-      finalStatus = "success";
-    } else if (result.success && result.pending) {
-      try {
-        await bot.editMessageText(
-          `Verification in progress for ${tool.name}...\nDocument submitted, waiting for SheerID review.\nThis can take up to 5 minutes.`,
-          { chat_id: chatId, message_id: statusMsg.message_id }
-        );
-      } catch {}
-
-      let resolved = false;
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 10000));
-        try {
-          const pollResult = await checkVerificationStatus(verificationId);
-          if (pollResult.currentStep === "success") {
-            finalStatus = "success"; finalRedirectUrl = pollResult.redirectUrl || finalRedirectUrl; resolved = true; break;
-          } else if (pollResult.currentStep === "error" || (pollResult.errorIds && pollResult.errorIds.length > 0)) {
-            finalStatus = "failed"; errorMsg = `Verification rejected: ${(pollResult.errorIds || []).join(", ") || "document review failed"}`; resolved = true; break;
-          }
-        } catch {}
-      }
-      if (!resolved) { finalStatus = "failed"; errorMsg = "Verification timed out waiting for SheerID review"; }
-    } else {
-      finalStatus = "failed"; errorMsg = result.message;
-    }
+    const serverResponse = await forwardToReplitServer(detectedToolId, link);
 
     statsData.totalAttempts++;
+
+    if (!serverResponse.ok) {
+      statsData.failedCount++;
+      if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
+      const errMsg = serverResponse.data?.message || `Server error (HTTP ${serverResponse.status})`;
+      await bot.sendMessage(chatId,
+        `Verification failed. Your ${VERIFICATION_COST} tokens have been refunded.\n\n` +
+        `Reason: ${errMsg}\n\nYour balance: ${user.tokens} tokens`
+      );
+      return;
+    }
+
+    const result = serverResponse.data;
+    const verification = result.verification;
+    const finalStatus = verification?.status || "failed";
+
     if (finalStatus === "success") {
       statsData.successCount++;
-      let successText = `Verification successful!\n\nTool: ${tool.name}\nName: ${firstName} ${lastName}\nEmail: ${email}\nUniversity: ${resolvedOrgName}\nBalance: ${user.tokens} tokens`;
-      if (finalRedirectUrl) successText += `\n\nClaim your offer: ${finalRedirectUrl}`;
+      let successText =
+        `Verification successful!\n\n` +
+        `Tool: ${tool.name}\n` +
+        `Name: ${verification.name || "N/A"}\n` +
+        `Email: ${verification.email || "N/A"}\n` +
+        `University: ${verification.university || "N/A"}\n` +
+        `Balance: ${user.tokens} tokens`;
+      if (result.redirectUrl) successText += `\n\nClaim your offer:\n${result.redirectUrl}`;
+      if (result.rewardCode) successText += `\n\nReward code: ${result.rewardCode}`;
       await bot.sendMessage(chatId, successText);
     } else {
       statsData.failedCount++;
       if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
+      const errorMsg = verification?.errorMessage || result.message || "Unknown error";
       await bot.sendMessage(chatId,
-        `Verification failed. Your ${VERIFICATION_COST} tokens have been refunded.\n\nReason: ${errorMsg || "Unknown error"}\n\nYour balance: ${user.tokens} tokens`
+        `Verification failed. Your ${VERIFICATION_COST} tokens have been refunded.\n\n` +
+        `Reason: ${errorMsg}\n\nYour balance: ${user.tokens} tokens`
       );
     }
   } catch (err) {
+    statsData.totalAttempts++;
+    statsData.failedCount++;
     if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
     await bot.sendMessage(chatId,
-      `An error occurred during verification. Your ${VERIFICATION_COST} tokens have been refunded.\n\nError: ${err.message || "Unknown error"}\n\nYour balance: ${user.tokens} tokens`
+      `An error occurred during verification. Your ${VERIFICATION_COST} tokens have been refunded.\n\n` +
+      `Error: ${err.message || "Unknown error"}\n\nYour balance: ${user.tokens} tokens`
     );
   }
 });
@@ -770,7 +415,7 @@ bot.onText(/\/admin(?:\s+(.+))?/, async (msg, match) => {
   } else if (subCmd === "stats") {
     const allUsers = Array.from(users.values());
     await bot.sendMessage(chatId,
-      `System Stats:\n\nTotal Users: ${allUsers.length}\nTotal Verifications: ${statsData.totalAttempts}\n` +
+      `System Stats:\n\nServer: ${REPLIT_SERVER}\nTotal Users: ${allUsers.length}\nTotal Verifications: ${statsData.totalAttempts}\n` +
       `Successful: ${statsData.successCount}\nFailed: ${statsData.failedCount}\n` +
       `Success Rate: ${statsData.totalAttempts > 0 ? Math.round((statsData.successCount / statsData.totalAttempts) * 100) : 0}%`
     );
@@ -799,4 +444,4 @@ process.on("unhandledRejection", (reason) => {
   }
 });
 
-console.log("[Bot] Standalone bot is running. Press Ctrl+C to stop.");
+console.log("[Bot] Standalone relay bot is running. All verifications forwarded to " + REPLIT_SERVER);
