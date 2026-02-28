@@ -106,7 +106,6 @@ function detectToolId(url) {
   const programId = extractProgramIdFromUrl(url);
   if (programId) {
     const verifyType = PROGRAM_ID_MAP[programId];
-    if (verifyType === "student") return "spotify-verify";
     if (verifyType === "teacher") return "boltnew-verify";
     if (verifyType === "k12teacher") return "k12-verify";
   }
@@ -499,21 +498,50 @@ bot.onText(/\/verify(?:\s+(.+))?/, async (msg, match) => {
     pendingSelections.set(selKey, link);
     setTimeout(() => pendingSelections.delete(selKey), 300000);
 
-    const buttons = [
-      [
-        { text: "🎵 Spotify", callback_data: `tool_spotify-verify|${selKey}` },
-        { text: "▶️ YouTube", callback_data: `tool_youtube-verify|${selKey}` },
-        { text: "🤖 Gemini", callback_data: `tool_one-verify|${selKey}` },
-      ],
-      [
-        { text: "⚡ Bolt.new", callback_data: `tool_boltnew-verify|${selKey}` },
-        { text: "🎨 Canva", callback_data: `tool_canva-teacher|${selKey}` },
-        { text: "🧠 ChatGPT", callback_data: `tool_k12-verify|${selKey}` },
-      ],
-    ];
+    const programId = extractProgramIdFromUrl(link);
+    const verifyType = programId ? PROGRAM_ID_MAP[programId] : null;
 
-    await bot.sendMessage(chatId,
-      "Could not auto-detect the service from this link.\nPlease select the correct tool:",
+    let buttons;
+    let promptText;
+
+    if (verifyType === "student") {
+      buttons = [
+        [
+          { text: "🎵 Spotify Premium", callback_data: `tool_spotify-verify|${selKey}` },
+        ],
+        [
+          { text: "▶️ YouTube Premium", callback_data: `tool_youtube-verify|${selKey}` },
+        ],
+        [
+          { text: "🤖 Gemini Advanced", callback_data: `tool_one-verify|${selKey}` },
+        ],
+      ];
+      promptText = "This is a student verification link.\nWhich service is this verification for?";
+    } else if (verifyType === "teacher") {
+      buttons = [
+        [
+          { text: "⚡ Bolt.new", callback_data: `tool_boltnew-verify|${selKey}` },
+          { text: "🎨 Canva Education", callback_data: `tool_canva-teacher|${selKey}` },
+        ],
+      ];
+      promptText = "This is a teacher verification link.\nWhich service is this verification for?";
+    } else {
+      buttons = [
+        [
+          { text: "🎵 Spotify", callback_data: `tool_spotify-verify|${selKey}` },
+          { text: "▶️ YouTube", callback_data: `tool_youtube-verify|${selKey}` },
+          { text: "🤖 Gemini", callback_data: `tool_one-verify|${selKey}` },
+        ],
+        [
+          { text: "⚡ Bolt.new", callback_data: `tool_boltnew-verify|${selKey}` },
+          { text: "🎨 Canva", callback_data: `tool_canva-teacher|${selKey}` },
+          { text: "🧠 ChatGPT", callback_data: `tool_k12-verify|${selKey}` },
+        ],
+      ];
+      promptText = "Could not auto-detect the service from this link.\nPlease select the correct tool:";
+    }
+
+    await bot.sendMessage(chatId, promptText,
       { reply_markup: { inline_keyboard: buttons } }
     );
     return;
