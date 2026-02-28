@@ -16,17 +16,24 @@ const DAILY_REWARD = 5;
 const REFERRAL_REWARD = 10;
 
 const TOOLS_DATA = {
-  "spotify-verify": { name: "Spotify Premium" },
-  "youtube-verify": { name: "YouTube Premium" },
-  "one-verify": { name: "Gemini Advanced" },
-  "boltnew-verify": { name: "Bolt.new" },
-  "canva-teacher": { name: "Canva Education" },
-  "k12-verify": { name: "ChatGPT Plus" },
-  "veterans-verify": { name: "Military Verification" },
-  "veterans-extension": { name: "Chrome Extension" },
+  "spotify-verify": { name: "Spotify Premium", emoji: "🎵" },
+  "youtube-verify": { name: "YouTube Premium", emoji: "▶️" },
+  "one-verify": { name: "Gemini Advanced", emoji: "🤖" },
+  "boltnew-verify": { name: "Bolt.new", emoji: "⚡" },
+  "canva-teacher": { name: "Canva Education", emoji: "🎨" },
+  "k12-verify": { name: "ChatGPT Plus", emoji: "🧠" },
+  "veterans-verify": { name: "Military Verification", emoji: "🛡️" },
+  "veterans-extension": { name: "Chrome Extension", emoji: "🌐" },
+};
+
+const PROGRAM_ID_MAP = {
+  "67c8c14f5f17a83b745e3f82": "student",
+  "68cc6a2e64f55220de204448": "teacher",
+  "68d47554aa292d20b9bec8f7": "k12teacher",
 };
 
 const users = new Map();
+const pendingSelections = new Map();
 const statsData = { totalAttempts: 0, successCount: 0, failedCount: 0 };
 
 function generateReferralCode() {
@@ -79,15 +86,32 @@ function isAdmin(username) {
   return username.toLowerCase() === ADMIN_USERNAME;
 }
 
+function extractProgramIdFromUrl(url) {
+  const match = url.match(/\/verify\/([a-f0-9]{24})\//i);
+  if (match) return match[1];
+  return null;
+}
+
 function detectToolId(url) {
   const linkLower = url.toLowerCase();
-  if (linkLower.includes("spotify")) return "spotify-verify";
-  if (linkLower.includes("youtube")) return "youtube-verify";
-  if (linkLower.includes("google") || linkLower.includes("one.google")) return "one-verify";
-  if (linkLower.includes("bolt")) return "boltnew-verify";
-  if (linkLower.includes("canva")) return "canva-teacher";
-  if (linkLower.includes("chatgpt") || linkLower.includes("openai")) return "k12-verify";
-  return "spotify-verify";
+
+  if (linkLower.includes("offers.spotify.com") || linkLower.includes("spotify.com")) return "spotify-verify";
+  if (linkLower.includes("youtube.com") || linkLower.includes("youtube.")) return "youtube-verify";
+  if (linkLower.includes("one.google.com") || linkLower.includes("gemini")) return "one-verify";
+  if (linkLower.includes("google.com/verify") || linkLower.includes("google.com/student")) return "one-verify";
+  if (linkLower.includes("bolt.new") || linkLower.includes("bolt")) return "boltnew-verify";
+  if (linkLower.includes("canva.com") || linkLower.includes("canva")) return "canva-teacher";
+  if (linkLower.includes("chatgpt.com") || linkLower.includes("openai.com") || linkLower.includes("chatgpt") || linkLower.includes("openai")) return "k12-verify";
+
+  const programId = extractProgramIdFromUrl(url);
+  if (programId) {
+    const verifyType = PROGRAM_ID_MAP[programId];
+    if (verifyType === "student") return "spotify-verify";
+    if (verifyType === "teacher") return "boltnew-verify";
+    if (verifyType === "k12teacher") return "k12-verify";
+  }
+
+  return null;
 }
 
 function parseVerificationId(url) {
@@ -97,15 +121,22 @@ function parseVerificationId(url) {
 }
 
 async function forwardToReplitServer(toolId, url) {
-  const response = await fetch(`${REPLIT_SERVER}/api/verifications/run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ toolId, url, autoGenerate: true }),
-    signal: AbortSignal.timeout(600000),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 540000);
 
-  const data = await response.json();
-  return { ok: response.ok, status: response.status, data };
+  try {
+    const response = await fetch(`${REPLIT_SERVER}/api/verifications/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toolId, url, autoGenerate: true }),
+      signal: controller.signal,
+    });
+
+    const data = await response.json();
+    return { ok: response.ok, status: response.status, data };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
@@ -206,6 +237,29 @@ bot.on("callback_query", async (query) => {
         await bot.answerCallbackQuery(query.id, { text: `Welcome! You earned ${JOIN_REWARD} tokens!` });
         await bot.sendMessage(chatId, `Welcome! You earned ${JOIN_REWARD} tokens!\nYour balance: ${user.tokens} tokens`);
       }
+    } else if (query.data && query.data.startsWith("tool_")) {
+      const parts = query.data.split("|");
+      const toolId = parts[0].replace("tool_", "");
+      const selectionKey = parts[1];
+      const url = pendingSelections.get(selectionKey);
+      pendingSelections.delete(selectionKey);
+
+      if (!toolId || !url) {
+        await bot.answerCallbackQuery(query.id, { text: "Selection expired. Please send /verify again.", show_alert: true });
+        return;
+      }
+
+      const tool = TOOLS_DATA[toolId];
+      await bot.answerCallbackQuery(query.id, { text: `Selected: ${tool?.name || toolId}` });
+
+      try {
+        await bot.editMessageText(
+          `Selected: ${tool?.emoji || ""} ${tool?.name || toolId}\nStarting verification...`,
+          { chat_id: chatId, message_id: query.message.message_id }
+        );
+      } catch {}
+
+      await runVerificationFlow(chatId, telegramId, toolId, url);
     }
   } catch (err) {
     console.error("[Telegram] callback error:", err.message);
@@ -257,6 +311,155 @@ bot.onText(/\/referral/, async (msg) => {
   await bot.sendMessage(chatId, `Your referral link:\n${referralLink}\n\nShare this link with friends. You'll earn ${REFERRAL_REWARD} tokens for each person who joins!`);
 });
 
+async function runVerificationFlow(chatId, telegramId, toolId, link) {
+  const user = getUser(telegramId);
+  if (!user) { await bot.sendMessage(chatId, "Please use /start first to register."); return; }
+
+  const deducted = deductTokens(telegramId, VERIFICATION_COST);
+  if (!deducted) { await bot.sendMessage(chatId, "Failed to deduct tokens. Please try again."); return; }
+
+  const tool = TOOLS_DATA[toolId];
+  const toolName = tool ? `${tool.emoji} ${tool.name}` : toolId;
+
+  const statusMsg = await bot.sendMessage(chatId,
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `${toolName}\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `Status: ⏳ Processing...\n` +
+    `Tokens deducted: ${VERIFICATION_COST}\n\n` +
+    `Forwarding to verification server.\n` +
+    `This may take up to 5 minutes.\n` +
+    `Please wait...`
+  );
+
+  let tokensRefunded = false;
+
+  try {
+    const serverResponse = await forwardToReplitServer(toolId, link);
+
+    statsData.totalAttempts++;
+
+    if (!serverResponse.ok) {
+      statsData.failedCount++;
+      if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
+      const errMsg = serverResponse.data?.message || `Server error (HTTP ${serverResponse.status})`;
+
+      try {
+        await bot.editMessageText(
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `${toolName}\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `Status: ❌ FAILED\n\n` +
+          `Reason: ${errMsg}\n\n` +
+          `Your ${VERIFICATION_COST} tokens have been refunded.\n` +
+          `Balance: ${user.tokens} tokens`,
+          { chat_id: chatId, message_id: statusMsg.message_id }
+        );
+      } catch {
+        await bot.sendMessage(chatId,
+          `❌ FAILED — ${toolName}\n\nReason: ${errMsg}\n\nYour ${VERIFICATION_COST} tokens have been refunded.\nBalance: ${user.tokens} tokens`
+        );
+      }
+      return;
+    }
+
+    const result = serverResponse.data;
+    const verification = result.verification;
+    const finalStatus = verification?.status || "failed";
+
+    if (finalStatus === "success") {
+      statsData.successCount++;
+
+      let successText =
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `${toolName}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Status: ✅ SUCCESS\n\n` +
+        `Name: ${verification.name || "N/A"}\n` +
+        `Email: ${verification.email || "N/A"}\n` +
+        `University: ${verification.university || "N/A"}\n` +
+        `Balance: ${user.tokens} tokens`;
+
+      if (result.rewardCode) {
+        successText += `\n\nReward Code: ${result.rewardCode}`;
+      }
+      if (result.redirectUrl) {
+        successText += `\n\nClaim your offer:\n${result.redirectUrl}`;
+      }
+
+      try {
+        await bot.editMessageText(successText, { chat_id: chatId, message_id: statusMsg.message_id });
+      } catch {
+        await bot.sendMessage(chatId, successText);
+      }
+    } else {
+      statsData.failedCount++;
+      if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
+
+      let rawError = verification?.errorMessage || result.message || "Unknown error";
+      let friendlyReason = rawError;
+
+      if (rawError.includes("timed out") || rawError.includes("timeout") || rawError.includes("TimeoutError")) {
+        friendlyReason = "The verification server took too long to respond. This usually means SheerID is under heavy load. Please try again in a few minutes.";
+      } else if (rawError.includes("expiredVerification")) {
+        friendlyReason = "This verification link has expired. Please generate a new verification link from the service website and try again.";
+      } else if (rawError.includes("noVerification")) {
+        friendlyReason = "The verification ID in this link is invalid or does not exist. Please double-check the link.";
+      } else if (rawError.includes("maxReviewsExceeded")) {
+        friendlyReason = "Maximum document review attempts exceeded for this verification. Please start a new verification.";
+      } else if (rawError.includes("HTTP 4")) {
+        const httpMatch = rawError.match(/HTTP (\d+)/);
+        friendlyReason = `SheerID rejected the request (Error ${httpMatch ? httpMatch[1] : "4xx"}). The verification link may be expired or invalid.`;
+      }
+
+      try {
+        await bot.editMessageText(
+          `━━━━━━━━━━━━━━━━━━━━\n` +
+          `${toolName}\n` +
+          `━━━━━━━━━━━━━━━━━━━━\n\n` +
+          `Status: ❌ FAILED\n\n` +
+          `Reason: ${friendlyReason}\n\n` +
+          `Your ${VERIFICATION_COST} tokens have been refunded.\n` +
+          `Balance: ${user.tokens} tokens`,
+          { chat_id: chatId, message_id: statusMsg.message_id }
+        );
+      } catch {
+        await bot.sendMessage(chatId,
+          `❌ FAILED — ${toolName}\n\nReason: ${friendlyReason}\n\nYour ${VERIFICATION_COST} tokens have been refunded.\nBalance: ${user.tokens} tokens`
+        );
+      }
+    }
+  } catch (err) {
+    statsData.totalAttempts++;
+    statsData.failedCount++;
+    if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
+
+    let friendlyError = err.message || "Unknown error";
+    if (err.name === "AbortError" || friendlyError.includes("abort")) {
+      friendlyError = "The request to the verification server timed out. The server may be busy. Please try again in a few minutes.";
+    } else if (friendlyError.includes("fetch") || friendlyError.includes("ECONNREFUSED") || friendlyError.includes("network")) {
+      friendlyError = "Could not connect to the verification server. It may be temporarily unavailable. Please try again shortly.";
+    }
+
+    try {
+      await bot.editMessageText(
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `${toolName}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n\n` +
+        `Status: ⚠️ ERROR\n\n` +
+        `${friendlyError}\n\n` +
+        `Your ${VERIFICATION_COST} tokens have been refunded.\n` +
+        `Balance: ${user.tokens} tokens`,
+        { chat_id: chatId, message_id: statusMsg.message_id }
+      );
+    } catch {
+      await bot.sendMessage(chatId,
+        `⚠️ ERROR — ${toolName}\n\n${friendlyError}\n\nYour ${VERIFICATION_COST} tokens have been refunded.\nBalance: ${user.tokens} tokens`
+      );
+    }
+  }
+}
+
 bot.onText(/\/verify(?:\s+(.+))?/, async (msg, match) => {
   const chatId = msg.chat.id;
   const telegramId = msg.from.id.toString();
@@ -266,7 +469,20 @@ bot.onText(/\/verify(?:\s+(.+))?/, async (msg, match) => {
   if (!user.hasJoinedChannel) { await bot.sendMessage(chatId, "Please join the channel and verify first using /start."); return; }
 
   const link = match?.[1]?.trim();
-  if (!link) { await bot.sendMessage(chatId, "Usage: /verify {link}\n\nExample: /verify https://offers.spotify.com/verify?verificationId=abc123"); return; }
+  if (!link) {
+    await bot.sendMessage(chatId,
+      "Usage: /verify {link}\n\n" +
+      "Example:\n/verify https://offers.spotify.com/verify?verificationId=abc123\n\n" +
+      "Supported services:\n" +
+      "🎵 Spotify Premium\n" +
+      "▶️ YouTube Premium\n" +
+      "🤖 Gemini Advanced\n" +
+      "⚡ Bolt.new\n" +
+      "🎨 Canva Education\n" +
+      "🧠 ChatGPT Plus"
+    );
+    return;
+  }
 
   if (user.tokens < VERIFICATION_COST) {
     await bot.sendMessage(chatId, `Insufficient tokens. You need ${VERIFICATION_COST} tokens but have ${user.tokens}.\n\nEarn tokens with /daily or /referral.`);
@@ -277,69 +493,38 @@ bot.onText(/\/verify(?:\s+(.+))?/, async (msg, match) => {
   if (!verificationId) { await bot.sendMessage(chatId, "Invalid link. URL must contain a verificationId parameter."); return; }
 
   const detectedToolId = detectToolId(link);
+
+  if (!detectedToolId) {
+    const selKey = crypto.randomBytes(4).toString("hex");
+    pendingSelections.set(selKey, link);
+    setTimeout(() => pendingSelections.delete(selKey), 300000);
+
+    const buttons = [
+      [
+        { text: "🎵 Spotify", callback_data: `tool_spotify-verify|${selKey}` },
+        { text: "▶️ YouTube", callback_data: `tool_youtube-verify|${selKey}` },
+        { text: "🤖 Gemini", callback_data: `tool_one-verify|${selKey}` },
+      ],
+      [
+        { text: "⚡ Bolt.new", callback_data: `tool_boltnew-verify|${selKey}` },
+        { text: "🎨 Canva", callback_data: `tool_canva-teacher|${selKey}` },
+        { text: "🧠 ChatGPT", callback_data: `tool_k12-verify|${selKey}` },
+      ],
+    ];
+
+    await bot.sendMessage(chatId,
+      "Could not auto-detect the service from this link.\nPlease select the correct tool:",
+      { reply_markup: { inline_keyboard: buttons } }
+    );
+    return;
+  }
+
   const tool = TOOLS_DATA[detectedToolId];
-  if (!tool) { await bot.sendMessage(chatId, "This verification tool is currently unavailable."); return; }
-
-  const deducted = deductTokens(telegramId, VERIFICATION_COST);
-  if (!deducted) { await bot.sendMessage(chatId, "Failed to deduct tokens. Please try again."); return; }
-
-  const statusMsg = await bot.sendMessage(chatId,
-    `Verification started for ${tool.name}...\n` +
-    `Tokens deducted: ${VERIFICATION_COST}\n` +
-    `Forwarding to server... Please wait, this may take several minutes.`
+  await bot.sendMessage(chatId,
+    `Auto-detected: ${tool.emoji} ${tool.name}\nStarting verification...`
   );
 
-  let tokensRefunded = false;
-  try {
-    const serverResponse = await forwardToReplitServer(detectedToolId, link);
-
-    statsData.totalAttempts++;
-
-    if (!serverResponse.ok) {
-      statsData.failedCount++;
-      if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
-      const errMsg = serverResponse.data?.message || `Server error (HTTP ${serverResponse.status})`;
-      await bot.sendMessage(chatId,
-        `Verification failed. Your ${VERIFICATION_COST} tokens have been refunded.\n\n` +
-        `Reason: ${errMsg}\n\nYour balance: ${user.tokens} tokens`
-      );
-      return;
-    }
-
-    const result = serverResponse.data;
-    const verification = result.verification;
-    const finalStatus = verification?.status || "failed";
-
-    if (finalStatus === "success") {
-      statsData.successCount++;
-      let successText =
-        `Verification successful!\n\n` +
-        `Tool: ${tool.name}\n` +
-        `Name: ${verification.name || "N/A"}\n` +
-        `Email: ${verification.email || "N/A"}\n` +
-        `University: ${verification.university || "N/A"}\n` +
-        `Balance: ${user.tokens} tokens`;
-      if (result.redirectUrl) successText += `\n\nClaim your offer:\n${result.redirectUrl}`;
-      if (result.rewardCode) successText += `\n\nReward code: ${result.rewardCode}`;
-      await bot.sendMessage(chatId, successText);
-    } else {
-      statsData.failedCount++;
-      if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
-      const errorMsg = verification?.errorMessage || result.message || "Unknown error";
-      await bot.sendMessage(chatId,
-        `Verification failed. Your ${VERIFICATION_COST} tokens have been refunded.\n\n` +
-        `Reason: ${errorMsg}\n\nYour balance: ${user.tokens} tokens`
-      );
-    }
-  } catch (err) {
-    statsData.totalAttempts++;
-    statsData.failedCount++;
-    if (!tokensRefunded) { addTokens(telegramId, VERIFICATION_COST); tokensRefunded = true; }
-    await bot.sendMessage(chatId,
-      `An error occurred during verification. Your ${VERIFICATION_COST} tokens have been refunded.\n\n` +
-      `Error: ${err.message || "Unknown error"}\n\nYour balance: ${user.tokens} tokens`
-    );
-  }
+  await runVerificationFlow(chatId, telegramId, detectedToolId, link);
 });
 
 bot.onText(/\/admin(?:\s+(.+))?/, async (msg, match) => {
