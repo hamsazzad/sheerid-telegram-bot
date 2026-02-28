@@ -41,41 +41,27 @@ const TOOLS_DATA = {
   "veterans-extension": { name: "Chrome Extension", isActive: true },
 };
 
-const UNIVERSITIES = [
-  { orgId: 2565, name: "Pennsylvania State University", domain: "psu.edu", country: "USA", weight: 100 },
-  { orgId: 3499, name: "University of California, Los Angeles", domain: "ucla.edu", country: "USA", weight: 98 },
-  { orgId: 1445, name: "University of Texas at Austin", domain: "utexas.edu", country: "USA", weight: 95 },
-  { orgId: 2233, name: "Ohio State University", domain: "osu.edu", country: "USA", weight: 92 },
-  { orgId: 1876, name: "University of Florida", domain: "ufl.edu", country: "USA", weight: 90 },
-  { orgId: 3321, name: "Arizona State University", domain: "asu.edu", country: "USA", weight: 88 },
-  { orgId: 4455, name: "University of Michigan", domain: "umich.edu", country: "USA", weight: 85 },
-  { orgId: 5566, name: "University of Washington", domain: "uw.edu", country: "USA", weight: 82 },
-  { orgId: 6677, name: "Boston University", domain: "bu.edu", country: "USA", weight: 80 },
-  { orgId: 7788, name: "New York University", domain: "nyu.edu", country: "USA", weight: 78 },
-  { orgId: 10001, name: "University of Oxford", domain: "ox.ac.uk", country: "UK", weight: 75 },
-  { orgId: 10002, name: "University of Cambridge", domain: "cam.ac.uk", country: "UK", weight: 73 },
-  { orgId: 10003, name: "Imperial College London", domain: "imperial.ac.uk", country: "UK", weight: 70 },
-  { orgId: 20001, name: "University of Tokyo", domain: "u-tokyo.ac.jp", country: "Japan", weight: 68 },
-  { orgId: 20002, name: "Kyoto University", domain: "kyoto-u.ac.jp", country: "Japan", weight: 65 },
-  { orgId: 30001, name: "Seoul National University", domain: "snu.ac.kr", country: "South Korea", weight: 63 },
-  { orgId: 30002, name: "Korea University", domain: "korea.ac.kr", country: "South Korea", weight: 60 },
-  { orgId: 40001, name: "University of Toronto", domain: "utoronto.ca", country: "Canada", weight: 72 },
-  { orgId: 40002, name: "University of British Columbia", domain: "ubc.ca", country: "Canada", weight: 70 },
-  { orgId: 50001, name: "University of Melbourne", domain: "unimelb.edu.au", country: "Australia", weight: 67 },
-  { orgId: 50002, name: "University of Sydney", domain: "sydney.edu.au", country: "Australia", weight: 65 },
-  { orgId: 60001, name: "FPT University", domain: "fpt.edu.vn", country: "Vietnam", weight: 80 },
-  { orgId: 60002, name: "VNU University of Science", domain: "hus.vnu.edu.vn", country: "Vietnam", weight: 78 },
-  { orgId: 70001, name: "Technical University of Munich", domain: "tum.de", country: "Germany", weight: 62 },
-  { orgId: 80001, name: "Sorbonne University", domain: "sorbonne-universite.fr", country: "France", weight: 60 },
-  { orgId: 651379, name: "Pennsylvania State University-World Campus", domain: "psu.edu", country: "USA", weight: 95 },
-  { orgId: 8387, name: "Pennsylvania State University-Penn State Harrisburg", domain: "psu.edu", country: "USA", weight: 90 },
-  { orgId: 8382, name: "Pennsylvania State University-Penn State Altoona", domain: "psu.edu", country: "USA", weight: 88 },
-  { orgId: 8396, name: "Pennsylvania State University-Penn State Berks", domain: "psu.edu", country: "USA", weight: 85 },
-  { orgId: 8379, name: "Pennsylvania State University-Penn State Brandywine", domain: "psu.edu", country: "USA", weight: 83 },
-  { orgId: 2560, name: "Pennsylvania State University-College of Medicine", domain: "psu.edu", country: "USA", weight: 80 },
-  { orgId: 650600, name: "Pennsylvania State University-Penn State Lehigh Valley", domain: "psu.edu", country: "USA", weight: 78 },
-  { orgId: 8388, name: "Pennsylvania State University-Penn State Hazleton", domain: "psu.edu", country: "USA", weight: 76 },
-  { orgId: 8394, name: "Pennsylvania State University-Penn State Worthington Scranton", domain: "psu.edu", country: "USA", weight: 74 },
+const PSU_SCHOOLS = [
+  { id: 2565, idExtended: "2565", name: "Pennsylvania State University-Main Campus", domain: "PSU.EDU" },
+  { id: 651379, idExtended: "651379", name: "Pennsylvania State University-World Campus", domain: "PSU.EDU" },
+  { id: 8387, idExtended: "8387", name: "Pennsylvania State University-Penn State Harrisburg", domain: "PSU.EDU" },
+  { id: 8382, idExtended: "8382", name: "Pennsylvania State University-Penn State Altoona", domain: "PSU.EDU" },
+  { id: 8396, idExtended: "8396", name: "Pennsylvania State University-Penn State Berks", domain: "PSU.EDU" },
+  { id: 8379, idExtended: "8379", name: "Pennsylvania State University-Penn State Brandywine", domain: "PSU.EDU" },
+  { id: 2560, idExtended: "2560", name: "Pennsylvania State University-College of Medicine", domain: "PSU.EDU" },
+  { id: 650600, idExtended: "650600", name: "Pennsylvania State University-Penn State Lehigh Valley", domain: "PSU.EDU" },
+  { id: 8388, idExtended: "8388", name: "Pennsylvania State University-Penn State Hazleton", domain: "PSU.EDU" },
+  { id: 8394, idExtended: "8394", name: "Pennsylvania State University-Penn State Worthington Scranton", domain: "PSU.EDU" },
+];
+
+const K12_SCHOOLS = [
+  { id: 3995910, idExtended: "3995910", name: "Springfield High School (Springfield, OR)" },
+  { id: 3995271, idExtended: "3995271", name: "Springfield High School (Springfield, OH)" },
+  { id: 3992142, idExtended: "3992142", name: "Springfield High School (Springfield, IL)" },
+  { id: 3996208, idExtended: "3996208", name: "Springfield High School (Springfield, PA)" },
+  { id: 4015002, idExtended: "4015002", name: "Springfield High School (Springfield, TN)" },
+  { id: 4015001, idExtended: "4015001", name: "Springfield High School (Springfield, VT)" },
+  { id: 4014999, idExtended: "4014999", name: "Springfield High School (Springfield, LA)" },
 ];
 
 const users = new Map();
@@ -191,10 +177,38 @@ function generateStudentId() {
   return `${Math.floor(100000000 + Math.random() * 900000000)}`;
 }
 
+function generateNewRelicHeaders() {
+  const traceId = crypto.randomUUID().replace(/-/g, "");
+  const spanId = crypto.randomUUID().replace(/-/g, "").substring(0, 16);
+  const timestamp = Date.now();
+  const payload = { v: [0, 1], d: { ty: "Browser", ac: "364029", ap: "120719994", id: spanId, tr: traceId, ti: timestamp } };
+  return {
+    newrelic: Buffer.from(JSON.stringify(payload)).toString("base64"),
+    traceparent: `00-${traceId}-${spanId}-01`,
+    tracestate: `364029@nr=0-1-364029-120719994-${spanId}----${timestamp}`,
+  };
+}
+
+function getSheerIdHeaders() {
+  const userAgents = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  ];
+  return {
+    "accept": "application/json",
+    "content-type": "application/json",
+    "user-agent": pick(userAgents),
+    "clientversion": "2.193.0",
+    "clientname": "jslib",
+    "x-sheerid-target-platform": "web",
+    ...generateNewRelicHeaders(),
+  };
+}
+
 async function sheeridRequest(method, url, body) {
   const options = {
     method,
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
+    headers: getSheerIdHeaders(),
     signal: AbortSignal.timeout(30000),
   };
   if (body) options.body = JSON.stringify(body);
@@ -203,17 +217,6 @@ async function sheeridRequest(method, url, body) {
   const text = await response.text();
   try { data = JSON.parse(text); } catch { data = text; }
   return { data, status: response.status };
-}
-
-async function searchOrganization(verificationId, searchTerm) {
-  try {
-    const url = `${SHEERID_BASE_URL}/rest/v2/verification/${verificationId}/organization?searchTerm=${encodeURIComponent(searchTerm)}`;
-    const { data, status } = await sheeridRequest("GET", url);
-    if (status === 200 && Array.isArray(data) && data.length > 0) {
-      return { id: data[0].id, name: data[0].name };
-    }
-    return null;
-  } catch { return null; }
 }
 
 async function uploadToS3(uploadUrl, data, mimeType) {
@@ -292,7 +295,7 @@ function generateDocumentPdf(firstName, lastName, verifyType, organizationName) 
 }
 
 async function runVerification(params) {
-  const { toolId, verificationId, firstName, lastName, email, birthDate, organizationId, organizationName, url } = params;
+  const { toolId, verificationId, firstName, lastName, email, birthDate, url } = params;
   const config = TOOL_CONFIGS[toolId];
   if (!config) return { success: false, pending: false, message: `No configuration for tool: ${toolId}`, verificationId, steps: [] };
 
@@ -300,32 +303,63 @@ async function runVerification(params) {
   const deviceFingerprint = generateDeviceFingerprint();
   const externalUserId = parseExternalUserId(url);
 
+  let school;
+  if (config.verifyType === "k12teacher") {
+    school = pick(K12_SCHOOLS);
+  } else {
+    school = pick(PSU_SCHOOLS);
+  }
+
   try {
-    const docData = generateDocumentPdf(firstName, lastName, config.verifyType, organizationName);
-    const documents = [{ fileName: "verification_document.png", data: docData, mimeType: "image/png" }];
-    steps.push({ step: "generateDocument", status: 200, data: { count: 1 } });
+    const docData = generateDocumentPdf(firstName, lastName, config.verifyType, school.name);
+    let documents;
+    if (config.verifyType === "teacher" || config.verifyType === "k12teacher") {
+      const docData2 = generateDocumentPdf(firstName, lastName, config.verifyType, school.name);
+      documents = [
+        { fileName: "teacher_id.png", data: docData, mimeType: "image/png" },
+        { fileName: "employment_letter.png", data: docData2, mimeType: "image/png" },
+      ];
+    } else {
+      documents = [{ fileName: "student_card.png", data: docData, mimeType: "image/png" }];
+    }
+    steps.push({ step: "generateDocument", status: 200, data: { count: documents.length } });
 
     const personalInfoBody = {
-      firstName, lastName, birthDate, email, phoneNumber: "",
-      organization: { id: organizationId, idExtended: String(organizationId), name: organizationName },
+      firstName, lastName,
+      birthDate: config.verifyType === "teacher" ? "" : birthDate,
+      email, phoneNumber: "",
+      organization: { id: school.id, idExtended: school.idExtended, name: school.name },
       deviceFingerprintHash: deviceFingerprint,
       locale: "en-US",
-      metadata: {
-        marketConsentValue: false,
-        refererUrl: `${SHEERID_BASE_URL}/verify/${config.programId}/?verificationId=${verificationId}`,
-        verificationId,
-        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
-      },
+      metadata: {},
     };
 
-    if (config.verifyType === "teacher" && externalUserId) {
-      personalInfoBody.externalUserId = externalUserId;
-      personalInfoBody.metadata.externalUserId = externalUserId;
-      personalInfoBody.metadata.refererUrl = url;
-    }
-
-    if (config.collectStep === "collectStudentPersonalInfo") {
-      personalInfoBody.metadata.flags = '{"collect-info-step-email-first":"default","doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","font-size":"default","include-cvec-field-france-student":"not-labeled-optional"}';
+    if (config.verifyType === "student") {
+      personalInfoBody.metadata = {
+        marketConsentValue: false,
+        verificationId,
+        refererUrl: `${SHEERID_BASE_URL}/verify/${config.programId}/?verificationId=${verificationId}`,
+        flags: '{"collect-info-step-email-first":"default","doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","font-size":"default","include-cvec-field-france-student":"not-labeled-optional"}',
+        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
+      };
+    } else if (config.verifyType === "teacher") {
+      const extUserId = externalUserId || `${Math.floor(1000000 + Math.random() * 9000000)}`;
+      personalInfoBody.externalUserId = extUserId;
+      personalInfoBody.metadata = {
+        marketConsentValue: true,
+        refererUrl: url,
+        externalUserId: extUserId,
+        flags: '{"doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","include-cvec-field-france-student":"not-labeled-optional","org-search-overlay":"default","org-selected-display":"default"}',
+        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
+      };
+    } else {
+      personalInfoBody.metadata = {
+        marketConsentValue: false,
+        verificationId,
+        refererUrl: `${SHEERID_BASE_URL}/verify/${config.programId}/?verificationId=${verificationId}`,
+        flags: '{"doc-upload-considerations":"default","doc-upload-may24":"default","doc-upload-redesign-use-legacy-message-keys":false,"docUpload-assertion-checklist":"default","include-cvec-field-france-student":"not-labeled-optional"}',
+        submissionOptIn: "By submitting the personal information above, I acknowledge that my personal information is being collected under the privacy policy of the business from which I am seeking a discount",
+      };
     }
 
     const step2 = await sheeridRequest("POST", `${SHEERID_BASE_URL}/rest/v2/verification/${verificationId}/step/${config.collectStep}`, personalInfoBody);
@@ -359,8 +393,12 @@ async function runVerification(params) {
       return { success: false, pending: false, message: "Failed to get upload URL", verificationId, steps };
     }
 
+    if (step4.data.documents.length < documents.length) {
+      return { success: false, pending: false, message: `Expected ${documents.length} upload URLs but got ${step4.data.documents.length}`, verificationId, steps };
+    }
+
     let allUploaded = true;
-    for (let i = 0; i < step4.data.documents.length && i < documents.length; i++) {
+    for (let i = 0; i < documents.length; i++) {
       const uploadUrl = step4.data.documents[i].uploadUrl;
       const doc = documents[i];
       const uploaded = await uploadToS3(uploadUrl, doc.data, doc.mimeType);
@@ -376,12 +414,13 @@ async function runVerification(params) {
 
     const finalStep = step5.data?.currentStep || "unknown";
     const redirectUrl = step5.data?.redirectUrl;
+    const rewardCode = step5.data?.rewardCode || step5.data?.rewardData?.rewardCode;
 
     if (finalStep === "success") {
-      return { success: true, pending: false, message: "Verification successful", verificationId, currentStep: finalStep, redirectUrl, steps };
+      return { success: true, pending: false, message: "Verification successful", verificationId, currentStep: finalStep, redirectUrl, rewardCode, steps };
     }
 
-    return { success: true, pending: true, message: "Document submitted, awaiting review", verificationId, currentStep: finalStep, redirectUrl, steps };
+    return { success: true, pending: true, message: "Document submitted, awaiting review", verificationId, currentStep: finalStep, redirectUrl, rewardCode, steps };
   } catch (error) {
     return {
       success: false, pending: false,
@@ -598,30 +637,12 @@ bot.onText(/\/verify(?:\s+(.+))?/, async (msg, match) => {
 
   let tokensRefunded = false;
   try {
-    const totalWeight = UNIVERSITIES.reduce((sum, u) => sum + u.weight, 0);
-    let rand = Math.random() * totalWeight;
-    let university = UNIVERSITIES[0];
-    for (const u of UNIVERSITIES) {
-      rand -= u.weight;
-      if (rand <= 0) { university = u; break; }
-    }
-
-    let resolvedOrgId = university.orgId;
-    let resolvedOrgName = university.name;
-    const sheeridOrg = await searchOrganization(verificationId, university.name);
-    if (sheeridOrg) {
-      resolvedOrgId = sheeridOrg.id;
-      resolvedOrgName = sheeridOrg.name;
-    }
-
     const { firstName, lastName } = generateRandomName();
-    const domain = university.domain || "psu.edu";
-    const email = generateEmail(firstName, lastName, domain);
+    const email = generateEmail(firstName, lastName, "psu.edu");
     const birthDate = generateBirthDate(config.verifyType);
 
     const result = await runVerification({
-      toolId: detectedToolId, verificationId, firstName, lastName, email, birthDate,
-      organizationId: resolvedOrgId, organizationName: resolvedOrgName, url: link,
+      toolId: detectedToolId, verificationId, firstName, lastName, email, birthDate, url: link,
     });
 
     let finalStatus = "failed";
